@@ -76,7 +76,7 @@ Oracle Database 19c / 21c XE
 ### 2. Database (Oracle DB)
 
 ```text
-- 1. 회원 정보 테이블 (USERS)
+1. 회원 정보 테이블 (USERS)
 CREATE TABLE USERS (
     USER_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, -- 회원 고유 번호 (PK, 자동증가)
     NAME VARCHAR2(50) NOT NULL,                              -- 회원 이름
@@ -86,7 +86,7 @@ CREATE TABLE USERS (
     CURRENT_TOKEN VARCHAR2(250);                             -- 회원 로그인 토큰
 );
 
-- 2. 노선/운행 일정 테이블 (SCHEDULES)
+2. 노선/운행 일정 테이블 (SCHEDULES)
 CREATE TABLE SCHEDULES (
     SCHEDULE_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, -- 운행 회차 ID (PK, 자동증가)
     DEPARTURE_STATION VARCHAR2(50) NOT NULL,                     -- 출발지 터미널명
@@ -98,7 +98,7 @@ CREATE TABLE SCHEDULES (
     TOTAL_SEATS NUMBER DEFAULT 28 NOT NULL                      -- 전체 좌석 수
 );
 
-- 3. 예약 정보 테이블 (RESERVATIONS)
+3. 예약 정보 테이블 (RESERVATIONS)
 CREATE TABLE RESERVATIONS (
     RESERVATION_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, -- 예약 번호 (PK, 자동증가)
     USER_ID NUMBER NOT NULL,                                        -- 회원 ID (FK)
