@@ -75,6 +75,7 @@ Oracle Database 19c / 21c XE
 
 ### 2. Database (Oracle DB)
 
+```text
 - 1. 회원 정보 테이블 (USERS)
 CREATE TABLE USERS (
     USER_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, -- 회원 고유 번호 (PK, 자동증가)
@@ -110,9 +111,11 @@ CREATE TABLE RESERVATIONS (
     CONSTRAINT FK_RES_SCHEDULE FOREIGN KEY (SCHEDULE_ID) REFERENCES SCHEDULES(SCHEDULE_ID), -- SCHEDULES 외래키 연결
     CONSTRAINT UK_SCHEDULE_SEAT UNIQUE (SCHEDULE_ID, SEAT_NUMBER) -- 회차별 좌석 중복 예약 방지 (유니크)
 );
+```
 
 ### 3. 환경 변수 설정 (.env)
 
+```text
 - bus-backend/.env
 PORT=5000
 DB_USER=bus_user
@@ -121,8 +124,11 @@ DB_CONNECT_STRING=localhost:1521/xepdb1
 
 - bus-frontend/.env
 REACT_APP_API_URL=http://localhost:5000
+```
 
 ### 4. 의존성 패키지 설치 및 실행
 
+```text
 루트 디렉토리(bus/)에서 실행:
 npm start   개발 서버 통합 실행 (Backend: 5000 / Frontend: 3000)
+```
