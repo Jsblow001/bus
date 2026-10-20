@@ -37,7 +37,6 @@ Oracle DB, Node.js Express, React를 기반으로 구축된 버스 예매 애플
 - **Runtime:** Node.js (Express.js)
 - **Database Driver:** `node-oracledb`
 - **Utilities:** `dotenv`, `cors`, `uuid`
-- **Runner:** `concurrently` (백엔드/프론트엔드 동시 실행)
 
 ### Database
 - **DBMS:** Oracle Database (XE Express Edition)
@@ -129,6 +128,11 @@ REACT_APP_API_URL=http://localhost:5000
 ### 4. 의존성 패키지 설치 및 실행
 
 ```text
-루트 디렉토리(bus/)에서 실행:
-npm start   개발 서버 통합 실행 (Backend: 5000 / Frontend: 3000)
+1. 백엔드 서버 실행:
+cd bus-backend
+npm start
+
+2. 프론트엔드 개발 서버 실행
+cd bus-frontend
+npm start
 ```
