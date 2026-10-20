@@ -64,18 +64,18 @@ bus/
     │   └── App.js
     ├── .env                   # REACT_APP_API_URL 백엔드 주소 설정
     └── package.json
+```
 
+## 🚀 시작하기 (Getting Started)
 
-# 🚀 시작하기 (Getting Started)
-
-1. Prerequisites (선택 사항)
+### 1. Prerequisites (선택 사항)
 
 Node.js (v16 이상 권장)
 Oracle Database 19c / 21c XE
 
-2. Database (Oracle DB)
+### 2. Database (Oracle DB)
 
--- 1. 회원 정보 테이블 (USERS)
+- 1. 회원 정보 테이블 (USERS)
 CREATE TABLE USERS (
     USER_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, -- 회원 고유 번호 (PK, 자동증가)
     NAME VARCHAR2(50) NOT NULL,                              -- 회원 이름
@@ -85,7 +85,7 @@ CREATE TABLE USERS (
     CURRENT_TOKEN VARCHAR2(250);                             -- 회원 로그인 토큰
 );
 
--- 2. 노선/운행 일정 테이블 (SCHEDULES)
+- 2. 노선/운행 일정 테이블 (SCHEDULES)
 CREATE TABLE SCHEDULES (
     SCHEDULE_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, -- 운행 회차 ID (PK, 자동증가)
     DEPARTURE_STATION VARCHAR2(50) NOT NULL,                     -- 출발지 터미널명
@@ -97,7 +97,7 @@ CREATE TABLE SCHEDULES (
     TOTAL_SEATS NUMBER DEFAULT 28 NOT NULL                      -- 전체 좌석 수
 );
 
--- 3. 예약 정보 테이블 (RESERVATIONS)
+- 3. 예약 정보 테이블 (RESERVATIONS)
 CREATE TABLE RESERVATIONS (
     RESERVATION_ID NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, -- 예약 번호 (PK, 자동증가)
     USER_ID NUMBER NOT NULL,                                        -- 회원 ID (FK)
@@ -111,18 +111,18 @@ CREATE TABLE RESERVATIONS (
     CONSTRAINT UK_SCHEDULE_SEAT UNIQUE (SCHEDULE_ID, SEAT_NUMBER) -- 회차별 좌석 중복 예약 방지 (유니크)
 );
 
-3. 환경 변수 설정 (.env)
+### 3. 환경 변수 설정 (.env)
 
---bus-backend/.env
+- bus-backend/.env
 PORT=5000
 DB_USER=bus_user
 DB_PASSWORD=your_password
 DB_CONNECT_STRING=localhost:1521/xepdb1
 
---bus-frontend/.env
+- bus-frontend/.env
 REACT_APP_API_URL=http://localhost:5000
 
-4. 의존성 패키지 설치 및 실행
+### 4. 의존성 패키지 설치 및 실행
 
 루트 디렉토리(bus/)에서 실행:
 npm start   개발 서버 통합 실행 (Backend: 5000 / Frontend: 3000)
