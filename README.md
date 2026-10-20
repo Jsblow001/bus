@@ -127,12 +127,13 @@ REACT_APP_API_URL=http://localhost:5000
 
 ### 4. 의존성 패키지 설치 및 실행
 
-```text
 1. 백엔드 서버 실행:
+```text
 cd bus-backend
 npm start
-
-2. 프론트엔드 개발 서버 실행
+```
+2. 프론트엔드 개발 서버 실행:
+```text
 cd bus-frontend
 npm start
 ```
