@@ -1,22 +1,82 @@
 import React, { useState, useEffect } from 'react';
 import SeatPicker from './SeatPicker';
 
+// 💡 백엔드 URL 환경 변수 설정
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 export default function BusBookingApp() {
+  // 💡 한국 시간대(KST) 기준 오늘 날짜 구하기
+  const offset = new Date().getTimezoneOffset() * 60000;
+  const today = new Date(Date.now() - offset).toISOString().split('T')[0];
+
   const [step, setStep] = useState(0);
+
+  // 💡 로그인 유저 상태 (기본값: 선택안함)
+  const [currentUser, setCurrentUser] = useState(null);
 
   const [search, setSearch] = useState({
     departure: '서울경부',
     arrival: '부산',
-    date: '2026-10-10',
+    date: today,
   });
 
   const [schedules, setSchedules] = useState([]);
   const [selectedBus, setSelectedBus] = useState(null);
-  const [selectedSeats, setSelectedSeats] = useState([]); // 선택한 좌석 배열
+  const [selectedSeats, setSelectedSeats] = useState([]);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false); // 결제 진행 중 상태
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const terminals = ['서울경부', '동서울', '부산', '대전', '광주', '대구', '강릉', '전주'];
+
+  // 💡 1. 간편 로그인 핸들러
+  const handleLogin = async (userId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setCurrentUser({ id: userId, name: `유저 ${userId}`, token: data.token });
+        alert(`유저 ${userId}(으)로 로그인되었습니다.`);
+      } else {
+        alert('로그인 처리에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('로그인 요청 에러:', err);
+      // 백엔드가 아직 준비되지 않은 경우 기본 상태로 세팅
+      setCurrentUser({ id: userId, name: `유저 ${userId}`, token: `mock-token-${userId}` });
+    }
+  };
+
+  // 💡 2. 실시간 중복 로그인 감지 (3초마다 서버 토큰 검증)
+  useEffect(() => {
+    if (!currentUser?.token) return;
+
+    const checkSessionInterval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/check-session?userId=${currentUser.id}&token=${currentUser.token}`
+        );
+        const data = await res.json();
+
+        // 서버의 토큰과 내 토큰이 다르면 강제 로그아웃
+        if (data.valid === false) {
+          alert('⚠️ 다른 브라우저/기기에서 동일한 계정으로 로그인되어 자동 로그아웃되었습니다.');
+          setCurrentUser(null);
+          setStep(0);
+          setSelectedSeats([]);
+          setSelectedBus(null);
+        }
+      } catch (err) {
+        console.error('세션 검증 실패:', err);
+      }
+    }, 3000);
+
+    return () => clearInterval(checkSessionInterval);
+  }, [currentUser]);
 
   // STEP 0 -> STEP 1: 시간표 조회
   const handleSearch = async (e) => {
@@ -28,13 +88,13 @@ export default function BusBookingApp() {
 
     try {
       const queryParams = new URLSearchParams(search).toString();
-      const response = await fetch(`http://localhost:5000/api/schedules?${queryParams}`);
+      const response = await fetch(`${API_BASE_URL}/api/schedules?${queryParams}`);
       if (!response.ok) throw new Error('시간표 조회 실패');
 
       const data = await response.json();
       setSchedules(data);
       setSelectedBus(null);
-      setSelectedSeats([]); // 검색 시 이전 선택 좌석 초기화
+      setSelectedSeats([]);
       setStep(1);
     } catch (err) {
       console.error(err);
@@ -42,10 +102,20 @@ export default function BusBookingApp() {
     }
   };
 
-  // STEP 2 진입 시: 해당 버스 회차의 이미 예약된 좌석 목록 조회
+  // 💡 STEP 1 -> STEP 2 진입 핸들러 (유저 미선택 시 진입 차단)
+  const handleGoToSeatSelection = () => {
+    if (!currentUser) {
+      alert('사용자를 먼저 선택(간편 로그인)해 주세요.');
+      setStep(0); // STEP 0(유저 선택 화면)으로 이동
+      return;
+    }
+    setStep(2); // 유저가 선택되어 있으면 좌석 선택 단계로 이동
+  };
+
+  // STEP 2 진입 시: 예약된 좌석 목록 조회
   useEffect(() => {
     if (step === 2 && selectedBus) {
-      fetch(`http://localhost:5000/api/reservations/seats?scheduleId=${selectedBus.SCHEDULE_ID}`)
+      fetch(`${API_BASE_URL}/api/reservations/seats?scheduleId=${selectedBus.SCHEDULE_ID}`)
         .then((res) => res.json())
         .then((data) => setOccupiedSeats(data.occupiedSeats || []))
         .catch((err) => {
@@ -72,19 +142,22 @@ export default function BusBookingApp() {
 
   // STEP 2 -> STEP 3: 좌석 선택 완료 후 결제 확인 창으로 이동
   const handleGoToPayment = () => {
+    if (!currentUser) return alert('로그인이 필요합니다. 유저를 선택해 주세요.');
     if (selectedSeats.length === 0) return alert('좌석을 1개 이상 선택해 주세요.');
-    setStep(3); // 결제 확인 창 단계로 이동
+    setStep(3);
   };
 
-  // STEP 3: 결제 확인 창에서 최종 결제 승인 요청
+  // STEP 3: 최종 결제 승인 요청
   const handleConfirmPayment = async () => {
+    if (!currentUser) return alert('로그인 상태를 확인해 주세요.');
+
     setIsSubmitting(true);
     try {
-      const response = await fetch('http://localhost:5000/api/book', {
+      const response = await fetch(`${API_BASE_URL}/api/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 1, // 테스트 회원 ID
+          userId: currentUser.id,
           scheduleId: selectedBus.SCHEDULE_ID,
           seatNumbers: selectedSeats,
         }),
@@ -93,19 +166,16 @@ export default function BusBookingApp() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        setStep(4); // 예매 완료 화면으로 이동
+        setStep(4);
       } else {
-        // 💡 중복 결제 실패 시 경고창 후 STEP 2(좌석 선택)로 이동
         alert(result.error || '선택하신 좌석이 이미 예매 완료되었거나 결제 처리에 실패했습니다.');
 
-        // 예약된 좌석 목록 최신화
         const updatedSeatsRes = await fetch(
-          `http://localhost:5000/api/reservations/seats?scheduleId=${selectedBus.SCHEDULE_ID}`
+          `${API_BASE_URL}/api/reservations/seats?scheduleId=${selectedBus.SCHEDULE_ID}`
         );
         const updatedSeatsData = await updatedSeatsRes.json();
         setOccupiedSeats(updatedSeatsData.occupiedSeats || []);
 
-        // 선택 좌석 초기화 후 좌석 선택 창으로 되돌림
         setSelectedSeats([]);
         setStep(2);
       }
@@ -126,6 +196,43 @@ export default function BusBookingApp() {
       {/* STEP 0: 출발지 / 도착지 / 날짜 선택 */}
       {step === 0 && (
         <form onSubmit={handleSearch} style={cardStyle}>
+          {/* 💡 간편 로그인 버튼 UI 영역 */}
+          <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#f7fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <label style={{ ...labelStyle, marginBottom: '8px', display: 'block' }}>
+              👤 사용자 선택 (간편 로그인)
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[1, 2, 3].map((userId) => (
+                <button
+                  key={userId}
+                  type="button"
+                  onClick={() => handleLogin(userId)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '6px',
+                    border: currentUser?.id === userId ? '2px solid #3182ce' : '1px solid #cbd5e0',
+                    backgroundColor: currentUser?.id === userId ? '#ebf8ff' : '#fff',
+                    fontWeight: currentUser?.id === userId ? 'bold' : 'normal',
+                    color: currentUser?.id === userId ? '#2b6cb0' : '#4a5568',
+                    cursor: 'pointer',
+                  }}
+                >
+                  유저 {userId} {currentUser?.id === userId && '✓'}
+                </button>
+              ))}
+            </div>
+            {currentUser ? (
+              <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#2b6cb0', fontWeight: 'bold' }}>
+                현재 접속 계정: {currentUser.name} (ID: {currentUser.id})
+              </p>
+            ) : (
+              <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#e53e3e' }}>
+                ⚠️ 미선택 상태입니다. 유저를 클릭하여 로그인해 주세요.
+              </p>
+            )}
+          </div>
+
           <h2>출발지 & 도착지 선택</h2>
 
           <div style={{ marginBottom: '16px' }}>
@@ -158,6 +265,7 @@ export default function BusBookingApp() {
             <label style={labelStyle}>가는 날</label>
             <input
               type="date"
+              min={today}
               value={search.date}
               onChange={(e) => setSearch({ ...search, date: e.target.value })}
               style={selectStyle}
@@ -186,6 +294,14 @@ export default function BusBookingApp() {
             <h3>선택한 노선 정보</h3>
             <p><strong>출발지:</strong> {search.departure} ➔ <strong>도착지:</strong> {search.arrival}</p>
             <p><strong>날짜:</strong> {search.date}</p>
+            <p>
+              <strong>예매 진행 계정:</strong>{' '}
+              {currentUser ? (
+                <span style={{ color: '#2b6cb0', fontWeight: 'bold' }}>{currentUser.name}</span>
+              ) : (
+                <span style={{ color: '#e53e3e', fontWeight: 'bold' }}>⚠️ 로그인 필요 (미선택)</span>
+              )}
+            </p>
           </div>
 
           <h3>운행 시간표 선택</h3>
@@ -214,9 +330,10 @@ export default function BusBookingApp() {
             ))
           )}
 
+          {/* 💡 onClick을 handleGoToSeatSelection으로 수정하여 계정 미선택 시 진입 차단 */}
           <button
             disabled={!selectedBus}
-            onClick={() => setStep(2)}
+            onClick={handleGoToSeatSelection}
             style={{
               ...btnStyle,
               backgroundColor: selectedBus ? '#3182ce' : '#cbd5e0',
@@ -289,6 +406,10 @@ export default function BusBookingApp() {
             <hr style={{ border: '0', borderTop: '1px solid #e2e8f0', margin: '16px 0' }} />
 
             <div style={infoRowStyle}>
+              <span><strong>예매자 계정:</strong></span>
+              <span>{currentUser?.name} (ID: {currentUser?.id})</span>
+            </div>
+            <div style={infoRowStyle}>
               <span><strong>노선 정보:</strong></span>
               <span>{search.departure} ➔ {search.arrival}</span>
             </div>
@@ -337,6 +458,7 @@ export default function BusBookingApp() {
       {step === 4 && (
         <div style={{ ...cardStyle, textAlign: 'center', backgroundColor: '#f0fff4', border: '2px solid #38a169' }}>
           <h2>🎉 결제 및 예매가 완료되었습니다!</h2>
+          <p><strong>예매자:</strong> {currentUser?.name}</p>
           <p>
             <strong>일정:</strong> {search.departure} ➔ {search.arrival} ({search.date} {selectedBus?.DEPARTURE_TIME})
           </p>

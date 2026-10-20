@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const oracledb = require('oracledb');
+const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
 const app = express();
@@ -114,7 +115,7 @@ app.post('/api/book', async (req, res) => {
       });
     }
 
-    // 2. 예매 데이터 INSERT (IDENTITY 자동증가 사용)
+    // 2. 예매 데이터 INSERT
     const insertSql = `
       INSERT INTO RESERVATIONS (USER_ID, SCHEDULE_ID, SEAT_NUMBER, PAYMENT_STATUS, RESERVED_AT)
       VALUES (:userId, :scheduleId, :seatNum, 'PAID', SYSDATE)
@@ -141,7 +142,6 @@ app.post('/api/book', async (req, res) => {
       }
     }
 
-    // UNIQUE 제약조건 위반(UK_SCHEDULE_SEAT) 예외 처리
     if (err.code === 'ORA-00001') {
       return res.status(409).json({ error: '이미 다른 사용자가 선점한 좌석입니다.' });
     }
@@ -156,6 +156,58 @@ app.post('/api/book', async (req, res) => {
         console.error('DB 연결 해제 실패:', closeErr);
       }
     }
+  }
+});
+
+// [API 4] 간편 로그인 처리 (DB에 접속하여 CURRENT_TOKEN 갱신)
+app.post('/api/login', async (req, res) => {
+  const { userId } = req.body;
+  const newToken = uuidv4();
+  let connection;
+
+  try {
+    connection = await oracledb.getConnection(dbConfig);
+
+    await connection.execute(
+      `UPDATE USERS SET CURRENT_TOKEN = :token WHERE USER_ID = :userId`,
+      { token: newToken, userId },
+      { autoCommit: true }
+    );
+
+    res.json({ success: true, userId, token: newToken });
+  } catch (err) {
+    console.error('로그인 처리 오류:', err);
+    res.status(500).json({ error: '로그인 처리 실패' });
+  } finally {
+    if (connection) await connection.close();
+  }
+});
+
+// [API 5] 실시간 중복 로그인 세션 체크
+app.get('/api/check-session', async (req, res) => {
+  const { userId, token } = req.query;
+  let connection;
+
+  try {
+    connection = await oracledb.getConnection(dbConfig);
+
+    const result = await connection.execute(
+      `SELECT CURRENT_TOKEN FROM USERS WHERE USER_ID = :userId`,
+      { userId }
+    );
+
+    const dbToken = result.rows[0]?.[0];
+
+    if (dbToken && dbToken === token) {
+      res.json({ valid: true });
+    } else {
+      res.json({ valid: false, message: '다른 기기에서 로그인되어 로그아웃됩니다.' });
+    }
+  } catch (err) {
+    console.error('세션 체크 오류:', err);
+    res.status(500).json({ valid: false });
+  } finally {
+    if (connection) await connection.close();
   }
 });
 
